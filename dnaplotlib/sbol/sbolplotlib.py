@@ -55,6 +55,31 @@ class SBOLRenderer(dpl.DNARenderer):
             "SO:0001978": "Signature",
         }
 
+    def _subcomponent_roles(self, subcomponent):
+        """Return roles for a SubComponent, falling back to its referenced Component.
+
+        SBOL3 SubComponents may omit their own roles while the Component they
+        reference via ``instance_of`` carries the Sequence Ontology role needed
+        for rendering. Use the SubComponent roles when present, otherwise look
+        up and return the referenced Component roles.
+        """
+        roles = list(getattr(subcomponent, "roles", []))
+        if roles:
+            return roles
+
+        instance_of = getattr(subcomponent, "instance_of", None)
+        if instance_of is None:
+            return roles
+
+        referenced_component = instance_of
+        if hasattr(instance_of, "lookup"):
+            try:
+                referenced_component = instance_of.lookup()
+            except Exception:
+                referenced_component = instance_of
+
+        return list(getattr(referenced_component, "roles", []))
+
     def renderSBOL(self, ax, target_component, part_renderers, opts=None, plot_backbone=True):
         """
         Render a design from an SBOL DNA Component
@@ -85,9 +110,10 @@ class SBOLRenderer(dpl.DNARenderer):
         # The SBOL data will be converted to a list of dictionaries used by DNAPlotLib
         dpl_design = []
         for subcomponent in target_component.features:
-            if not subcomponent.roles:
+            subcomponent_roles = self._subcomponent_roles(subcomponent)
+            if not subcomponent_roles:
                 raise ValueError("Subcomponent does not have a role.  Cannot render SBOL.")
-            SO_term = subcomponent.roles[0].split("/")[-1]
+            SO_term = subcomponent_roles[0].split("/")[-1]
             # TODO else if SO term of DNAComponent is not recognized, default to a USER_DEFINED sbol symbol
             if SO_term in list(self.SO_terms().keys()):
                 part = {}
