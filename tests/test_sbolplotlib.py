@@ -33,9 +33,10 @@ class LookupReference:
 
 
 class SubComponent:
-    def __init__(self, roles=None, instance_of=None):
+    def __init__(self, roles=None, instance_of=None, role_integration=None):
         self.roles = roles or []
         self.instance_of = instance_of
+        self.role_integration = role_integration
 
 
 def test_subcomponent_roles_prefers_subcomponent_roles():
@@ -52,5 +53,27 @@ def test_subcomponent_roles_falls_back_to_referenced_component_roles():
     renderer = SBOLRenderer()
     referenced_component = ReferencedComponent(["https://identifiers.org/SO:0000316"])
     subcomponent = SubComponent(instance_of=LookupReference(referenced_component))
+
+    assert renderer._subcomponent_roles(subcomponent) == ["https://identifiers.org/SO:0000316"]
+
+
+def test_subcomponent_roles_honors_override_roles():
+    renderer = SBOLRenderer()
+    referenced_component = ReferencedComponent(["https://identifiers.org/SO:0000316"])
+    subcomponent = SubComponent(
+        instance_of=LookupReference(referenced_component),
+        role_integration="http://sbols.org/v3#overrideRoles",
+    )
+
+    assert renderer._subcomponent_roles(subcomponent) == []
+
+
+def test_subcomponent_roles_falls_back_for_merge_roles():
+    renderer = SBOLRenderer()
+    referenced_component = ReferencedComponent(["https://identifiers.org/SO:0000316"])
+    subcomponent = SubComponent(
+        instance_of=LookupReference(referenced_component),
+        role_integration="http://sbols.org/v3#mergeRoles",
+    )
 
     assert renderer._subcomponent_roles(subcomponent) == ["https://identifiers.org/SO:0000316"]

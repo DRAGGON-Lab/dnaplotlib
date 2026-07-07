@@ -61,10 +61,14 @@ class SBOLRenderer(dpl.DNARenderer):
         SBOL3 SubComponents may omit their own roles while the Component they
         reference via ``instance_of`` carries the Sequence Ontology role needed
         for rendering. Use the SubComponent roles when present, otherwise look
-        up and return the referenced Component roles.
+        up and return the referenced Component roles unless ``role_integration``
+        explicitly says to override referenced roles.
         """
         roles = list(getattr(subcomponent, "roles", []))
         if roles:
+            return roles
+
+        if self._uses_override_roles(subcomponent):
             return roles
 
         instance_of = getattr(subcomponent, "instance_of", None)
@@ -79,6 +83,25 @@ class SBOLRenderer(dpl.DNARenderer):
                 referenced_component = instance_of
 
         return list(getattr(referenced_component, "roles", []))
+
+    def _uses_override_roles(self, subcomponent):
+        """Return True when a SubComponent explicitly overrides referenced roles."""
+        role_integration = getattr(subcomponent, "role_integration", None)
+        if role_integration is None:
+            return False
+
+        if isinstance(role_integration, str):
+            role_integrations = [role_integration]
+        else:
+            try:
+                role_integrations = list(role_integration)
+            except TypeError:
+                role_integrations = [role_integration]
+
+        return any(
+            str(integration).replace("#", "/").split("/")[-1] == "overrideRoles"
+            for integration in role_integrations
+        )
 
     def renderSBOL(self, ax, target_component, part_renderers, opts=None, plot_backbone=True):
         """
